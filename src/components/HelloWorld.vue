@@ -1,5 +1,11 @@
 <script setup>
-  import {ref, watch} from 'vue';
+  import {computed, ref, watch} from 'vue';
+  const STORAGE_KEY = "mh_crown_data";
+  const VERSION_KEY = "mh_crown_version";
+  const CURRENT_VERSION = "1.0.0";
+
+  const savedVersion = localStorage.getItem(VERSION_KEY);
+  const savedData = localStorage.getItem(STORAGE_KEY);
 
   // ===魔物資料區===
   const monsters = ref([
@@ -33,14 +39,28 @@
   ])
 
   // ===初始化區域(localStroage)===
-  const monsterData = JSON.parse(localStorage.getItem("monsterData"));
-  if(monsterData){
-    monsters.value.splice(0, monsters.value.length,...monsterData)
+
+  //第一次載入或版本不一致合併資料
+  if(savedVersion != CURRENT_VERSION){
+    localStorage.setItem(VERSION_KEY, CURRENT_VERSION);
+    let merged = monsters.value.map(monster => {
+      const oldList = JSON.parse(savedData || "[]");
+      const match = oldList.find(item => item.name === monster.name);
+      return match ? {...monster, big_crown:match.big_crown, small_crown:match.small_crown} : monster;
+    })
+    monsters.value = merged;
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(monsters.value));
+  }
+  else{
+    const savedData = localStorage.getItem(STORAGE_KEY);
+    if(savedData){
+      monsters.value = JSON.parse(savedData);
+    }
   }
 
   // ===操作區===
   const saveToLocalStorage = () =>{
-    localStorage.setItem("monsterData",JSON.stringify(monsters.value));
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(monsters.value));
   }
 
   watch(monsters,() => {
@@ -62,12 +82,18 @@
         return "#555151"; //大金小金皆沒完成
       }
   }
+  //大小金完成進度計算
+  const total = computed(() => monsters.value.length);
+  const achievementBar = computed(() => {
+    return monsters.value.filter(monsters => monsters.big_crown && monsters.small_crown).length
+   });
 </script>
 
 <template>
   <div>
     <h1>魔物獵人大小金</h1>
     <p>請勾選已收集的大小金</p>
+    <p>目前大小金進度: {{ achievementBar }} / {{ total }}</p>
     <div class="grid-box">
       <div v-for="monster in monsters" :key="monster.name" class="monster-card" :style="{backgroundColor: crownChecked(monster)}">
         <img :src="getImgUrl(monster.icon)" :alt="monster.name" width="270" height="270"/>
@@ -170,6 +196,5 @@
       font-size: 1.2em;
       font-weight: bold;
     }
-    
   }
 </style>
